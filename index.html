@@ -1,0 +1,776 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>全屏太阳系动态模型模拟器 | 实时演示行星公转、自转与月球潮汐现象</title>
+    <meta name="keywords" itemprop="keywords" content="太阳系模拟器,太阳系动态模型,行星公转自转,月球潮汐模拟,全屏天文模拟,太阳系3D演示,地球自转公转,天文教育工具,互动太阳系,太空科普">
+    <meta name="description" itemprop="description" content="沉浸式全屏太阳系动态模拟器，带速度控制的太阳系模型，真实还原八大行星公转、自转轨迹及月球对地球潮汐的影响。支持3D交互、时间加速、轨道显示，适合天文爱好者与课堂教学使用。">
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background-color: #000;
+            overflow: hidden;
+            font-family: Arial, sans-serif;
+            color: white;
+        }
+        .header {
+            position: fixed;
+            top: 20px;
+            left: 0;
+            right: 0;
+            z-index: 100;
+            text-align: center;
+            margin-bottom: 10px;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 24px;
+            color: #4fc3f7;
+            text-shadow: 0 0 10px rgba(79, 195, 247, 0.7);
+        }
+        .controls {
+            position: fixed;
+            top: 60px;
+            left: 0;
+            right: 0;
+            z-index: 100;
+            margin-bottom: 10px;
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+        .control-group {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            background-color: rgba(50, 50, 50, 0.5);
+            padding: 10px;
+            border-radius: 5px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        button {
+            background-color: #333;
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        button:hover {
+            background-color: #555;
+        }
+        .control-group label {
+            font-size: 12px;
+        }
+        canvas {
+            display: block;
+            width: 100vw;
+            height: 100vh;
+            box-shadow: 0 0 20px rgba(0, 100, 255, 0.3);
+        }
+        .footer {
+            position: fixed;
+            bottom: 20px;
+            left: 0;
+            right: 0;
+            z-index: 100;
+            text-align: center;
+            font-size: 12px;
+            color: #bbbbbb;
+            background-color: rgba(0, 0, 0, 0.8);
+            padding: 15px;
+            border-radius: 8px;
+            margin: 0 auto;
+            width: min(800px, 90%);
+            box-sizing: border-box;
+            line-height: 1.6;
+        }
+        .footer p {
+            margin: 5px 0;
+        }
+        .dialog {display:none; position:fixed; font-size: 14px; color: #FF00FF; top:10%; width:300px; height:auto; background:white; padding:20px; text-align: left;border:1px solid grey; z-index:1000;}
+        .dialog p {
+            color: #ff0000;
+            text-align: center;
+            font-size: 18px;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>太阳系动态模型（含潮汐）</h1>
+    </div>
+    <div class="controls">
+        <div class="control-group">
+            <button id="zoomIn">放大</button>
+            <button id="zoomOut">缩小</button>
+            <button id="reset">重置</button>
+        </div>
+        <div class="control-group">
+            <button id="sizeUp">球体变大</button>
+            <button id="sizeDown">球体变小</button>
+            <button id="toggleNames">显示/隐藏名称</button>
+        </div>
+        <div class="control-group">
+            <label for="speedControl">动画速度:</label>
+            <input type="range" id="speedControl" min="0" max="200" value="100">
+            <span id="speedValue">1.0x</span>
+        </div>
+        <div class="control-group">
+            <button id="toggleTide">开启/关闭潮汐</button>
+        </div>
+    </div>
+    <canvas id="solarSystem"></canvas>
+    <div class="footer">
+        <p>地球公转周期: 365.25天 | 自转周期: 24小时 | 当前时间: <span id="currentTime"></span> <a href="https://beian.miit.gov.cn" rel="nofollow noopener" target="_blank" style="margin-right: 7px;">鄂ICP备2024032875号-3</a></p>
+        <p>本网站是沉浸式全屏太阳系动态模拟器，带速度控制的太阳系模型，真实还原八大行星公转、自转轨迹及月球对地球潮汐的影响。支持3D交互、时间加速、轨道显示，适合天文爱好者与课堂教学使用</p>
+        
+        <button id="moonTidesButton">月球潮汐</button>
+        <div id="dialog" class="dialog">
+            <p>月球潮汐: </p>
+            <H5>月球引力引起地球海洋潮汐变化，形成涨潮和退潮现象；潮汐主要是由月球和 太阳的引潮力决定的。</H5>
+            <H5>月球虽比太阳质量小，它的引潮力却比太阳高约2.17倍。 每当月球移动到和太阳在一条直线上，两天体的引潮力就会作用于同一方向， 海水的涨落必然增大。这就是人们常说的“初一、十五涨大潮”的原因。</H5>
+            <p><button id="closeDialog">关闭</button></p>
+        </div>
+        
+        <button id="qubieButton">恒星,行星和卫星的区别</button>
+        <div id="qubie" class="dialog">
+            <p>恒星,行星和卫星简单记忆法</p>
+            <H5>恒星‌：像太阳一样自己会“燃烧”发光。</H5>
+            <H5>行星‌：像地球一样绕着恒星转，自己不发光。</H5>
+            <H5>卫星‌：像月球一样绕着行星转。</H5>
+            
+            <p>恒星,行星和卫星的区别</p>
+            <H5>能自己发光发热的是恒星，围绕恒星运行的是行星，围绕行星的是卫星。</H5>
+            <H5>恒星是指宇宙中靠核聚变产生的能量而自身能发热发光的星体.过去天文学家以为恒星的位置是永恒不变的。</H5>
+            <H5>行星是自身不发光的,环绕着恒星的天体。</H5>
+            <H5>卫星是环绕一颗天体按一定的轨道做周期性运行的物体.其包括人造卫星和与此相对的天然卫星。</H5>
+            <p><button id="closequbie">关闭</button></p>
+        </div>
+        
+        <button id="jieqiButton">24节气</button>
+        <div id="jieqi" class="dialog">
+            <p>24节气分布</p>
+            <H5>‌春季‌(3- 5月)：立春、雨水、惊蛰、春分、清明、谷雨。</H5>
+            <H5>‌夏季‌(6- 8月)：立夏、小满、芒种、夏至、小暑、大暑。</H5>
+            <H5>‌秋季‌(9-11月)：立秋、处暑、白露、秋分、寒露、霜降。</H5>
+            <H5>‌冬季‌(12-2月)：立冬、小雪、大雪、冬至、小寒、大寒。</H5>
+            
+            <p>节气与四季的其他划分方式对比</p>
+            <H5>‌天文划分法‌：以春分、夏至、秋分、冬至为四季起点。</H5>
+            <H5>‌气象划分法‌：按阳历月份划分（如3-5月为春季）。</H5>
+            <H5>‌农历划分法‌：民间习惯用农历月份对应四季。</H5>
+            <p><button id="closejieqi">关闭</button></p>
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('moonTidesButton').addEventListener('click', function() {
+            document.getElementById('dialog').style.display = 'block';
+        });
+        
+        document.getElementById('closeDialog').addEventListener('click', function() {
+            document.getElementById('dialog').style.display = 'none';
+        });
+
+        document.getElementById('qubieButton').addEventListener('click', function() {
+            document.getElementById('qubie').style.display = 'block';
+        });
+        
+        document.getElementById('closequbie').addEventListener('click', function() {
+            document.getElementById('qubie').style.display = 'none';
+        });
+
+        document.getElementById('jieqiButton').addEventListener('click', function() {
+            document.getElementById('jieqi').style.display = 'block';
+        });
+        
+        document.getElementById('closejieqi').addEventListener('click', function() {
+            document.getElementById('jieqi').style.display = 'none';
+        });
+        
+        const canvas = document.getElementById('solarSystem');
+        const ctx = canvas.getContext('2d');
+        const currentTimeElement = document.getElementById('currentTime');
+
+        // 设置canvas尺寸为全屏
+        function setCanvasSize() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+
+        // 初始化canvas尺寸
+        setCanvasSize();
+
+        // 监听窗口大小变化
+        window.addEventListener('resize', () => {
+            setCanvasSize();
+        });
+
+        // 缩放和偏移控制
+        let scale = 1;
+        let offsetX = 0;
+        let offsetY = 0;
+        let isDragging = false;
+        let lastX, lastY;
+
+        // 球体大小控制
+        let sizeFactor = 1.0;
+
+        // 名称显示控制
+        let showNames = true;
+
+        // 动画速度控制（默认1.0）
+        let animationSpeed = 1.0;
+
+        // 潮汐开关
+        let showTide = false;
+
+        // 定义太阳系天体信息（太阳初始大小改为18）
+        const celestialBodies = {
+            sun: {
+                image: null,
+                size: 18, // 修改为18
+                x: 0,
+                y: 0,
+                loaded: false,
+                name: "太阳",
+                rotation: 0
+            },
+            mercury: {
+                image: null,
+                size: 5,
+                orbitRadius: 50,
+                speed: 4,
+                angle: 0,
+                loaded: false,
+                name: "水星",
+                rotation: 0
+            },
+            venus: {
+                image: null,
+                size: 8,
+                orbitRadius: 80,
+                speed: 3,
+                angle: 0,
+                loaded: false,
+                name: "金星",
+                rotation: 0
+            },
+            earth: {
+                image: null,
+                size: 10,
+                orbitRadius: 120,
+                speed: 2,
+                angle: 0,
+                loaded: false,
+                name: "地球",
+                rotation: 0,
+                rotationSpeed: 0.05,
+                moon: {
+                    image: null,
+                    size: 3,
+                    orbitRadius: 30,
+                    speed: 8,
+                    angle: 0,
+                    loaded: false,
+                    name: "月球",
+                    rotation: 0
+                }
+            },
+            mars: {
+                image: null,
+                size: 7,
+                orbitRadius: 160,
+                speed: 1.5,
+                angle: 0,
+                loaded: false,
+                name: "火星",
+                rotation: 0
+            },
+            jupiter: {
+                image: null,
+                size: 12,
+                orbitRadius: 190,
+                speed: 1,
+                angle: 0,
+                loaded: false,
+                name: "木星",
+                rotation: 0
+            },
+            saturn: {
+                image: null,
+                size: 24,
+                orbitRadius: 210,
+                speed: 0.8,
+                angle: 0,
+                loaded: false,
+                name: "土星",
+                rotation: 0
+            },
+            uranus: {
+                image: null,
+                size: 9,
+                orbitRadius: 240,
+                speed: 0.5,
+                angle: 0,
+                loaded: false,
+                name: "天王星",
+                rotation: 0
+            },
+            neptune: {
+                image: null,
+                size: 8,
+                orbitRadius: 270,
+                speed: 0.4,
+                angle: 0,
+                loaded: false,
+                name: "海王星",
+                rotation: 0
+            }
+        };
+
+        // 星星数组
+        const stars = [];
+
+        // 加载图片资源
+        function loadImages() {
+            const imagesToLoad = [
+                { name: 'sun', url: 'https://img.alicdn.com/imgextra/i1/O1CN01oVLbLx22VlN34KDQs_!!6000000007126-2-tps-800-800.png' },
+                { name: 'mercury', url: 'https://img.alicdn.com/imgextra/i2/O1CN01UjgqIB1SrRxQfrflh_!!6000000002300-2-tps-800-800.png' },
+                { name: 'venus', url: 'https://img.alicdn.com/imgextra/i3/O1CN01JGEgLU1dfxnVvp91R_!!6000000003764-2-tps-800-800.png' },
+                { name: 'earth', url: 'https://img.alicdn.com/imgextra/i4/O1CN01R6wlzD1IhhMlBcGLg_!!6000000000925-2-tps-800-800.png' },
+                { name: 'moon', url: 'https://img.alicdn.com/imgextra/i4/O1CN01Ad5SeB20tv1nfRoA2_!!6000000006908-2-tps-800-800.png' },
+                { name: 'mars', url: 'https://img.alicdn.com/imgextra/i1/O1CN01OlZAk81OVEHJ0pazq_!!6000000001710-2-tps-800-800.png' },
+                { name: 'jupiter', url: 'https://img.alicdn.com/imgextra/i2/O1CN01MA3Mk51bAhWxWxHim_!!6000000003425-2-tps-800-800.png' },
+                { name: 'saturn', url: 'https://img.alicdn.com/imgextra/i2/O1CN01NG2FjS1XDDEofNNhg_!!6000000002889-2-tps-800-800.png' },
+                { name: 'uranus', url: 'https://img.alicdn.com/imgextra/i1/O1CN01wnxTX51xIPkTHqPBr_!!6000000006420-2-tps-800-800.png' },
+                { name: 'neptune', url: 'https://img.alicdn.com/imgextra/i1/O1CN01LTf0rT25zwJWsIDkD_!!6000000007598-2-tps-800-800.png' }
+            ];
+
+            let loadedCount = 0;
+            const totalImages = imagesToLoad.length;
+
+            imagesToLoad.forEach(img => {
+                const image = new Image();
+                image.onload = () => {
+                    if (img.name === 'earth') {
+                        celestialBodies.earth.image = image;
+                        celestialBodies.earth.loaded = true;
+                    } else if (img.name === 'moon') {
+                        celestialBodies.earth.moon.image = image;
+                        celestialBodies.earth.moon.loaded = true;
+                    } else {
+                        celestialBodies[img.name].image = image;
+                        celestialBodies[img.name].loaded = true;
+                    }
+                    loadedCount++;
+                    if (loadedCount === totalImages) {
+                        initStars();
+                        setupEventListeners();
+                        updateTime();
+                        setInterval(updateTime, 1000);
+                        animate();
+                    }
+                };
+                image.src = img.url;
+            });
+        }
+
+        // 初始化星星
+        function initStars() {
+            for (let i = 0; i < 500; i++) {
+                stars.push({
+                    x: Math.random() * canvas.width,
+                    y: Math.random() * canvas.height,
+                    size: 0.5 + Math.random() * 1.5,
+                    opacity: 0.3 + Math.random() * 0.7
+                });
+            }
+        }
+
+        // 更新时间显示
+        function updateTime() {
+            const now = new Date();
+            const year = now.getFullYear();
+            const month = String(now.getMonth() + 1).padStart(2, '0');
+            const day = String(now.getDate()).padStart(2, '0');
+            const hours = String(now.getHours()).padStart(2, '0');
+            const minutes = String(now.getMinutes()).padStart(2, '0');
+            const seconds = String(now.getSeconds()).padStart(2, '0');
+            
+            currentTimeElement.textContent = `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+        }
+
+        // 设置事件监听器
+        function setupEventListeners() {
+            // 鼠标拖拽
+            canvas.addEventListener('mousedown', (e) => {
+                isDragging = true;
+                lastX = e.clientX;
+                lastY = e.clientY;
+            });
+
+            canvas.addEventListener('mousemove', (e) => {
+                if (isDragging) {
+                    const deltaX = e.clientX - lastX;
+                    const deltaY = e.clientY - lastY;
+                    offsetX += deltaX / scale;
+                    offsetY += deltaY / scale;
+                    lastX = e.clientX;
+                    lastY = e.clientY;
+                }
+            });
+
+            canvas.addEventListener('mouseup', () => {
+                isDragging = false;
+            });
+
+            canvas.addEventListener('mouseleave', () => {
+                isDragging = false;
+            });
+
+            // 鼠标滚轮缩放
+            canvas.addEventListener('wheel', (e) => {
+                e.preventDefault();
+                const zoomIntensity = 0.1;
+                const mouseX = e.clientX - canvas.getBoundingClientRect().left;
+                const mouseY = e.clientY - canvas.getBoundingClientRect().top;
+                
+                const relX = (mouseX - canvas.width/2 - offsetX) / scale;
+                const relY = (mouseY - canvas.height/2 - offsetY) / scale;
+                
+                if (e.deltaY < 0) {
+                    scale *= (1 + zoomIntensity);
+                } else {
+                    scale *= (1 - zoomIntensity);
+                }
+                
+                scale = Math.max(0.1, Math.min(scale, 10));
+                offsetX = mouseX - canvas.width/2 - relX * scale;
+                offsetY = mouseY - canvas.height/2 - relY * scale;
+            });
+
+            // 按钮事件
+            document.getElementById('zoomIn').addEventListener('click', () => {
+                scale *= 1.2;
+                scale = Math.min(scale, 10);
+            });
+
+            document.getElementById('zoomOut').addEventListener('click', () => {
+                scale *= 0.8;
+                scale = Math.max(scale, 0.1);
+            });
+
+            document.getElementById('reset').addEventListener('click', () => {
+                scale = 1;
+                offsetX = 0;
+                offsetY = 0;
+            });
+
+            document.getElementById('sizeUp').addEventListener('click', () => {
+                sizeFactor *= 1.2;
+            });
+
+            document.getElementById('sizeDown').addEventListener('click', () => {
+                sizeFactor *= 0.8;
+                sizeFactor = Math.max(sizeFactor, 0.1);
+            });
+
+            document.getElementById('toggleNames').addEventListener('click', () => {
+                showNames = !showNames;
+            });
+
+            document.getElementById('toggleTide').addEventListener('click', () => {
+                showTide = !showTide;
+            });
+
+            // 速度滑块
+            const speedSlider = document.getElementById('speedControl');
+            const speedValue = document.getElementById('speedValue');
+            speedSlider.addEventListener('input', () => {
+                animationSpeed = parseFloat(speedSlider.value) / 100;
+                speedValue.textContent = `${animationSpeed.toFixed(1)}x`;
+            });
+        }
+
+        // 绘制背景
+        function drawBackground() {
+            const gradient = ctx.createRadialGradient(
+                canvas.width / 2, 
+                canvas.height / 2, 
+                0,
+                canvas.width / 2, 
+                canvas.height / 2, 
+                Math.max(canvas.width, canvas.height) / 2
+            );
+            gradient.addColorStop(0, '#1C2837');
+            gradient.addColorStop(1, '#050608');
+
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            stars.forEach(star => {
+                const adjustedX = star.x;
+                const adjustedY = star.y;
+                const adjustedSize = star.size;
+                if(adjustedX >= -adjustedSize && adjustedX <= canvas.width + adjustedSize &&
+                   adjustedY >= -adjustedSize && adjustedY <= canvas.height + adjustedSize) {
+                    ctx.beginPath();
+                    ctx.fillStyle = `rgba(255, 255, 255, ${star.opacity})`;
+                    ctx.arc(adjustedX, adjustedY, adjustedSize, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            });
+        }
+
+        // 绘制轨道
+        function drawOrbit(orbitRadius) {
+            ctx.beginPath();
+            ctx.ellipse(
+                canvas.width / 2 + offsetX * scale, 
+                canvas.height / 2 + offsetY * scale, 
+                orbitRadius * scale, 
+                orbitRadius * 0.7 * scale,
+                0, 
+                0, 
+                Math.PI * 2
+            );
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
+            ctx.setLineDash([5, 5]);
+            ctx.lineWidth = 1;
+            ctx.stroke();
+            ctx.setLineDash([]);
+        }
+
+        // 绘制潮汐效果（地球上的两个潮汐隆起）
+        function drawTideEffect(earthX, earthY, earthSize, moonAngle) {
+            if (!showTide) return;
+
+            const tideHeight = earthSize * 0.1;
+            const tideWidth = earthSize * 0.2;
+
+            // 潮汐方向：一个朝向月球，一个背向月球
+            const angle1 = moonAngle;
+            const angle2 = moonAngle + Math.PI;
+
+            // 第一个潮汐隆起（朝向月球）
+            const tide1X = earthX + Math.cos(angle1) * (earthSize / 2 + tideHeight / 2);
+            const tide1Y = earthY + Math.sin(angle1) * (earthSize / 2 + tideHeight / 2) * 0.7;
+
+            // 第二个潮汐隆起（背向月球）
+            const tide2X = earthX + Math.cos(angle2) * (earthSize / 2 + tideHeight / 2);
+            const tide2Y = earthY + Math.sin(angle2) * (earthSize / 2 + tideHeight / 2) * 0.7;
+
+            // 绘制第一个潮汐
+            ctx.save();
+            ctx.translate(tide1X, tide1Y);
+            ctx.rotate(angle1);
+            ctx.fillStyle = 'rgba(0, 150, 255, 0.6)';
+            ctx.beginPath();
+            ctx.ellipse(0, 0, tideWidth / 2, tideHeight / 2, 0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+
+            // 绘制第二个潮汐
+            ctx.save();
+            ctx.translate(tide2X, tide2Y);
+            ctx.rotate(angle2);
+            ctx.fillStyle = 'rgba(0, 150, 255, 0.6)';
+            ctx.beginPath();
+            ctx.ellipse(0, 0, tideWidth / 2, tideHeight / 2, 0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+        }
+
+        function setLabelFont(baseSize = 4) {
+            const fontSize = Math.max(4, baseSize * scale * sizeFactor);
+            ctx.font = `${fontSize}px Arial`;
+            ctx.textAlign = 'center';
+            ctx.fillStyle = 'white';
+        }
+        // 绘制天体
+        function drawCelestialBody(body, centerX, centerY, angle) {
+            if (!body.loaded) return;
+
+            const x = centerX + Math.cos(angle) * body.orbitRadius;
+            const y = centerY + Math.sin(angle) * body.orbitRadius * 0.7;
+
+            const scaledX = canvas.width / 2 + (x + offsetX) * scale;
+            const scaledY = canvas.height / 2 + (y + offsetY) * scale;
+            const scaledSize = body.size * scale * sizeFactor;
+
+            ctx.save();
+            ctx.translate(scaledX, scaledY);
+            ctx.rotate(body.rotation);
+            ctx.drawImage(
+                body.image,
+                -scaledSize / 2,
+                -scaledSize / 2,
+                scaledSize,
+                scaledSize
+            );
+            ctx.restore();
+
+            if (showNames) {
+                setLabelFont(4); // 这里传入你想要的基础字号
+                ctx.fillText(
+                    body.name,
+                    scaledX,
+                    scaledY + scaledSize / 2 + 2 * scale * sizeFactor
+                );
+            }
+
+            if (body.rotationSpeed) {
+                body.rotation += body.rotationSpeed * animationSpeed;
+            } else {
+                body.rotation += 0.01 * animationSpeed;
+            }
+
+            return { x: scaledX, y: scaledY, size: scaledSize };
+        }
+
+        // 绘制太阳系
+        function drawSolarSystem() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            drawBackground();
+
+            // 绘制太阳
+            if (celestialBodies.sun.loaded) {
+                const scaledX = canvas.width / 2 + (celestialBodies.sun.x + offsetX) * scale;
+                const scaledY = canvas.height / 2 + (celestialBodies.sun.y + offsetY) * scale;
+                const scaledSize = celestialBodies.sun.size * scale * sizeFactor;
+
+                ctx.save();
+                ctx.translate(scaledX, scaledY);
+                ctx.rotate(celestialBodies.sun.rotation);
+                ctx.drawImage(
+                    celestialBodies.sun.image,
+                    -scaledSize / 2,
+                    -scaledSize / 2,
+                    scaledSize,
+                    scaledSize
+                );
+                ctx.restore();
+                
+                celestialBodies.sun.rotation += 0.005 * animationSpeed;
+
+                if (showNames) {
+                    ctx.fillStyle = 'white';
+                    ctx.font = `${Math.max(4, 4 * scale * sizeFactor)}px Arial`;
+                    ctx.textAlign = 'center';
+                    ctx.fillText(
+                        celestialBodies.sun.name,
+                        scaledX,
+                        scaledY + scaledSize / 2 + 2 * scale * sizeFactor
+                    );
+                }
+            }
+
+            // 绘制各行星轨道
+            for (const planetName in celestialBodies) {
+                if (planetName !== 'sun' && celestialBodies[planetName].orbitRadius) {
+                    drawOrbit(celestialBodies[planetName].orbitRadius);
+                }
+            }
+
+            // 绘制行星
+            for (const planetName in celestialBodies) {
+                if (planetName !== 'sun' && celestialBodies[planetName].orbitRadius) {
+                    const planet = celestialBodies[planetName];
+                    const planetPos = drawCelestialBody(planet, 0, 0, planet.angle);
+                    
+                    planet.angle += 0.01 * planet.speed * animationSpeed;
+                    
+                    // 地球特殊处理（月球+潮汐）
+                    if (planetName === 'earth' && planet.moon.loaded) {
+                        const earthX = Math.cos(planet.angle) * planet.orbitRadius;
+                        const earthY = Math.sin(planet.angle) * planet.orbitRadius * 0.7;
+                        
+                        // 月球轨道
+                        ctx.beginPath();
+                        ctx.ellipse(
+                            canvas.width / 2 + (earthX + offsetX) * scale, 
+                            canvas.height / 2 + (earthY + offsetY) * scale, 
+                            planet.moon.orbitRadius * scale, 
+                            planet.moon.orbitRadius * 0.7 * scale,
+                            0, 
+                            0, 
+                            Math.PI * 2
+                        );
+                        ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+                        ctx.setLineDash([3, 3]);
+                        ctx.lineWidth = 1;
+                        ctx.stroke();
+                        ctx.setLineDash([]);
+                        
+                        // 绘制月球
+                        const moonX = earthX + Math.cos(planet.moon.angle) * planet.moon.orbitRadius;
+                        const moonY = earthY + Math.sin(planet.moon.angle) * planet.moon.orbitRadius * 0.7;
+                        
+                        const scaledMoonX = canvas.width / 2 + (moonX + offsetX) * scale;
+                        const scaledMoonY = canvas.height / 2 + (moonY + offsetY) * scale;
+                        const scaledMoonSize = planet.moon.size * scale * sizeFactor;
+                        
+                        ctx.save();
+                        ctx.translate(scaledMoonX, scaledMoonY);
+                        ctx.rotate(planet.moon.rotation);
+                        ctx.drawImage(
+                            planet.moon.image,
+                            -scaledMoonSize / 2,
+                            -scaledMoonSize / 2,
+                            scaledMoonSize,
+                            scaledMoonSize
+                        );
+                        ctx.restore();
+                        
+                        planet.moon.rotation += 0.02 * animationSpeed;
+                        
+                        if (showNames) {
+                            ctx.fillStyle = 'white';
+                            ctx.font = `${Math.max(4, 3 * scale * sizeFactor)}px Arial`;
+                            ctx.textAlign = 'center';
+                            ctx.fillText(
+                                planet.moon.name,
+                                scaledMoonX,
+                                scaledMoonY + scaledMoonSize / 2 + 2 * scale * sizeFactor
+                            );
+                        }
+                        
+                        planet.moon.angle += 0.01 * planet.moon.speed * animationSpeed;
+
+                        // 绘制潮汐效果（在地球图像之上）
+                        if (showTide) {
+                            const earthScaledX = canvas.width / 2 + (earthX + offsetX) * scale;
+                            const earthScaledY = canvas.height / 2 + (earthY + offsetY) * scale;
+                            const earthScaledSize = planet.size * scale * sizeFactor;
+                            drawTideEffect(earthScaledX, earthScaledY, earthScaledSize, planet.moon.angle);
+                        }
+                    }
+                }
+            }
+        }
+
+        // 动画循环
+        function animate() {
+            drawSolarSystem();
+            requestAnimationFrame(animate);
+        }
+
+        // 启动程序 http://baike.baidu.com/l/R48ZX4Gf
+        loadImages();
+    </script>
+</body>
+</html>
+
+
